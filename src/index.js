@@ -9,19 +9,71 @@ app.use(cors());
 
 const users = [];
 
+
+
 function checksExistsUserAccount(request, response, next) {
-  // Complete aqui
+  const {username} = request.headers
+  const user = users.find( user => user.username === username)
+
+  if(!user){
+    return response.status(404).json({error:"User not foud!"})
+  }
+
+  request.user = user
+  return next()
 }
 
+
 function checksCreateTodosUserAvailability(request, response, next) {
-  // Complete aqui
+  const {user}=request
+
+
+  if(user.pro===true || (user.todos.length < 10 && user.pro===false)){
+    return next()
+  }else{
+    return response.status(403).json({error:"Usuario já atingiu o limite de inserções"})
+  } 
+
 }
 
 function checksTodoExists(request, response, next) {
-  // Complete aqui
+  const {id} = request.params
+  const {username} = request.headers
+  const user = users.find( user => user.username === username)
+
+  if(!user){
+    return response.status(404).json({error:"User not foud!"})
+  }
+
+  if(!validate(id)){
+    return response.status(400).json({error:"ID not UUID!"})
+  }
+  
+  const todo = user.todos.find(todo => todo.id === id);
+
+  if(!todo){
+    return response.status(404).json({error:"Todo not foud!"})
+  } 
+
+  request.user = user
+  request.todo= todo
+
+  return next()
+
 }
 
+
 function findUserById(request, response, next) {
+  const {id} = request.params
+  const user = users.find( user => user.id === id)
+
+  if(!user){
+    return response.status(404).json({error:"User not foud!"})
+  }
+
+  request.user = user
+  return next()
+ 
   // Complete aqui
 }
 
@@ -89,14 +141,28 @@ app.post('/todos', checksExistsUserAccount, checksCreateTodosUserAvailability, (
 });
 
 app.put('/todos/:id', checksTodoExists, (request, response) => {
-  const { title, deadline } = request.body;
-  const { todo } = request;
+  const {title, deadline}= request.body
+  const {user}=request
+  const {id}=request.params
 
-  todo.title = title;
-  todo.deadline = new Date(deadline);
 
-  return response.json(todo);
+  todoIndex = user.todos.findIndex(todo => todo.id === id)
+
+  if (todoIndex > -1){
+      user.todos[todoIndex].title=title,
+      user.todos[todoIndex].deadline= new Date(deadline)
+      return response.status(201).json({deadline:user.todos[todoIndex].deadline,
+                                        done:user.todos[todoIndex].done,
+                                        title:user.todos[todoIndex].title }).send()
+  }else{
+    return response.status(404).json({error:"Todo not Found"}).send()
+  }
+
 });
+
+
+
+
 
 app.patch('/todos/:id/done', checksTodoExists, (request, response) => {
   const { todo } = request;
@@ -112,7 +178,7 @@ app.delete('/todos/:id', checksExistsUserAccount, checksTodoExists, (request, re
   const todoIndex = user.todos.indexOf(todo);
 
   if (todoIndex === -1) {
-    return response.status(404).json({ error: 'Todo not found' });
+    return response.status(404).json({ error: 'Todo not found' }).send();
   }
 
   user.todos.splice(todoIndex, 1);
